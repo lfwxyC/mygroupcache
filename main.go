@@ -14,7 +14,7 @@ var db = map[string]string{
 	"ccc": "690",
 }
 
-func createGroup() *geecache.Group {
+func createGroup(cacheType geecache.CacheType) *geecache.Group {
 	return geecache.NewGroup("scores", geecache.GetterFunc(
 		func(key string) ([]byte, error) {
 			log.Println("[SlowDB] search key", key)
@@ -22,7 +22,7 @@ func createGroup() *geecache.Group {
 				return []byte(v), nil
 			}
 			return nil, fmt.Errorf("%s not exist", key)
-		}), 2<<10)
+		}), 2<<10, cacheType)
 }
 
 func startCacheServer(self string, addrs []string, gee *geecache.Group) {
@@ -52,8 +52,10 @@ func startAPIServer(apiAddr string, gee *geecache.Group) {
 func main() {
 	var port int
 	var api bool
+	var lfu bool // 淘汰策略是否使用lfu，默认为lru
 	flag.IntVar(&port, "port", 8001, "Geecache server port")
 	flag.BoolVar(&api, "api", false, "Start a api server?")
+	flag.BoolVar(&lfu, "lfu", false, "Use lfu?")
 	flag.Parse()
 
 	apiAddr := "http://localhost:9999"
@@ -68,7 +70,11 @@ func main() {
 		addrs = append(addrs, v)
 	}
 
-	gee := createGroup()
+	cacheType := geecache.LRU
+	if lfu {
+		cacheType = geecache.LFU
+	}
+	gee := createGroup(geecache.CacheType(cacheType))
 	if api {
 		go startAPIServer(apiAddr, gee)
 	}

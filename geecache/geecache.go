@@ -33,7 +33,7 @@ var (
 	groups = make(map[string]*Group)
 )
 
-func NewGroup(name string, getter Getter, cacheBytes int64) *Group {
+func NewGroup(name string, getter Getter, cacheBytes int64, cacheType CacheType) *Group {
 	if getter == nil {
 		panic("nil Getter")
 	}
@@ -42,7 +42,7 @@ func NewGroup(name string, getter Getter, cacheBytes int64) *Group {
 	g := &Group{
 		name:      name,
 		getter:    getter,
-		mainCache: cache{cacheBytes: cacheBytes},
+		mainCache: cache{cacheType: cacheType, cacheBytes: cacheBytes},
 		loader:    &singleflight.Group{},
 	}
 	groups[name] = g

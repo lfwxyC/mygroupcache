@@ -1,28 +1,26 @@
-package lru
+package geecache
 
-import "container/list"
+import (
+	"container/list"
+)
 
-type Cache struct {
+type LRUCache struct {
 	maxBytes int64      // 允许使用的最大内存
 	nBytes   int64      // 当前已使用的内存
 	ll       *list.List // 双向链表
 	cache    map[string]*list.Element
 	// 某条记录被移除时的回调函数，可以为nil
-	OnEvicted func(key string, value Value)
+	OnEvicted func(key string, value ByteView)
 }
 
 // list.Element.Value的数据类型
-type entry struct {
+type lruEntry struct {
 	key   string // 淘汰队首节点时，用key从字典中删除对应的映射
-	value Value
+	value ByteView
 }
 
-type Value interface {
-	Len() int // 值所占用的内存大小
-}
-
-func New(maxBytes int64, onEvicted func(string, Value)) *Cache {
-	return &Cache{
+func NewLRUCache(maxBytes int64, onEvicted func(string, ByteView)) *LRUCache {
+	return &LRUCache{
 		maxBytes:  maxBytes,
 		ll:        list.New(),
 		cache:     make(map[string]*list.Element),
@@ -30,14 +28,14 @@ func New(maxBytes int64, onEvicted func(string, Value)) *Cache {
 	}
 }
 
-func (c *Cache) Add(key string, value Value) {
+func (c *LRUCache) Add(key string, value ByteView) {
 	if ele, ok := c.cache[key]; ok {
-		kv := ele.Value.(*entry)
+		kv := ele.Value.(*lruEntry)
 		kv.value = value
 		c.nBytes += int64(value.Len()) - int64(kv.value.Len())
 		c.ll.MoveToFront(ele)
 	} else {
-		ele := c.ll.PushFront(&entry{key: key, value: value})
+		ele := c.ll.PushFront(&lruEntry{key: key, value: value})
 		c.cache[key] = ele
 		c.nBytes += int64(len(key)) + int64(value.Len())
 	}
@@ -46,10 +44,10 @@ func (c *Cache) Add(key string, value Value) {
 	}
 }
 
-func (c *Cache) RemoveOldest() {
+func (c *LRUCache) RemoveOldest() {
 	ele := c.ll.Back()
 	if ele != nil {
-		kv := ele.Value.(*entry)
+		kv := ele.Value.(*lruEntry)
 		delete(c.cache, kv.key)
 		c.nBytes -= int64(len(kv.key)) + int64(kv.value.Len())
 		if c.OnEvicted != nil {
@@ -59,15 +57,15 @@ func (c *Cache) RemoveOldest() {
 	}
 }
 
-func (c *Cache) Get(key string) (value Value, ok bool) {
+func (c *LRUCache) Get(key string) (value ByteView, ok bool) {
 	if ele, ok := c.cache[key]; ok {
 		c.ll.MoveToFront(ele)
-		kv := ele.Value.(*entry)
+		kv := ele.Value.(*lruEntry)
 		return kv.value, true
 	}
 	return
 }
 
-func (c *Cache) Len() int {
+func (c *LRUCache) Len() int {
 	return c.ll.Len()
 }
